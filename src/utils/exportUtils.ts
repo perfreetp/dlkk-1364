@@ -19,9 +19,20 @@ export const exportToBookmarksHTML = (
   collections: Collection[]
 ): string => {
   const now = Math.floor(Date.now() / 1000);
+  const getToolName = (id: string) => tools.find((t) => t.id === id)?.name || id;
 
   const formatBookmark = (tool: Tool): string => {
-    return `            <DT><A HREF="${tool.url}" ADD_DATE="${now}">${tool.name}</A>`;
+    let result = `            <DT><A HREF="${tool.url}" ADD_DATE="${now}">${tool.name}</A>`;
+    const descriptions: string[] = [];
+    if (tool.description) descriptions.push(tool.description);
+    if (tool.alternatives && tool.alternatives.length > 0) {
+      const altNames = tool.alternatives.map(getToolName).join('、');
+      descriptions.push(`替代工具：${altNames}`);
+    }
+    if (descriptions.length > 0) {
+      result += `\n            <DD>${descriptions.join(' | ')}</DD>`;
+    }
+    return result;
   };
 
   const formatFolder = (collection: Collection, allTools: Tool[]): string => {

@@ -48,10 +48,11 @@ export default function Library() {
 
     if (Object.keys(paramsFromUrl).length > 0) {
       isSyncingRef.current = true;
+      resetFilters();
       setFilters(paramsFromUrl);
       setTimeout(() => { isSyncingRef.current = false; }, 50);
     }
-  }, [searchParams, setFilters]);
+  }, [searchParams, resetFilters, setFilters]);
 
   useEffect(() => {
     if (isInitRef.current || isSyncingRef.current) return;

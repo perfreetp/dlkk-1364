@@ -160,15 +160,34 @@ export const useCollectionStore = create<CollectionState>()(
             else if (folderLower.includes('ai') || folderLower.includes('人工智能')) category = 'ai';
           }
 
+          let description = bookmark.description || '';
+          let alternatives: string[] = [];
+
+          if (description) {
+            const altMatch = description.match(/[|｜]?\s*替代工具[：:]\s*(.+)$/);
+            if (altMatch) {
+              const altNamesStr = altMatch[1].trim();
+              const altNames = altNamesStr.split(/[、,，]/).map((s) => s.trim()).filter(Boolean);
+              const currentTools = useToolStore.getState().tools;
+              alternatives = altNames
+                .map((name) => currentTools.find((t) => t.name === name)?.id)
+                .filter((id): id is string => !!id);
+              description = description.replace(altMatch[0], '').trim();
+              if (description.endsWith('|') || description.endsWith('｜')) {
+                description = description.slice(0, -1).trim();
+              }
+            }
+          }
+
           const result = await addTool({
             name: bookmark.name || bookmark.title || bookmark.url,
             url: bookmark.url,
-            description: bookmark.description || '',
+            description,
             category,
             tags: [],
             price: 'free',
             screenshots: [],
-            alternatives: [],
+            alternatives,
           });
 
           if (result.success) {

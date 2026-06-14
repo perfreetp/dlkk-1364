@@ -3,6 +3,7 @@ export interface ParsedBookmark {
   name: string;
   url: string;
   folder: string;
+  description?: string;
   addDate?: number;
 }
 
@@ -14,7 +15,8 @@ export const parseBookmarksHTML = (html: string): ParsedBookmark[] => {
   const parseNode = (node: Element, currentFolder: string = '未分类') => {
     const children = Array.from(node.children);
 
-    for (const child of children) {
+    for (let i = 0; i < children.length; i++) {
+      const child = children[i];
       if (child.tagName === 'DT') {
         const h3 = child.querySelector('h3');
         const link = child.querySelector('a');
@@ -29,12 +31,19 @@ export const parseBookmarksHTML = (html: string): ParsedBookmark[] => {
           const addDateStr = link.getAttribute('add_date');
           const addDate = addDateStr ? parseInt(addDateStr, 10) * 1000 : undefined;
 
+          let description: string | undefined;
+          const nextSibling = child.nextElementSibling;
+          if (nextSibling && nextSibling.tagName === 'DD') {
+            description = nextSibling.textContent?.trim() || undefined;
+          }
+
           if (url && url.startsWith('http')) {
             bookmarks.push({
               title,
               name: title,
               url,
               folder: currentFolder,
+              description,
               addDate,
             });
           }
