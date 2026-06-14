@@ -1,10 +1,10 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useMemo, useEffect, useState } from 'react';
 import type { Tool, FilterOptions } from '@/types';
 import { filterTools } from '@/utils/searchFilter';
 import { useDebounce } from './useDebounce';
 
-export function useSearch(tools: Tool[]) {
-  const [filters, setFilters] = useState<FilterOptions>({
+export function useSearch(tools: Tool[], externalFilters?: FilterOptions) {
+  const [internalFilters, setInternalFilters] = useState<FilterOptions>({
     category: 'all',
     tags: [],
     price: [],
@@ -15,6 +15,8 @@ export function useSearch(tools: Tool[]) {
   });
   const [isLoading, setIsLoading] = useState(false);
 
+  const filters = externalFilters ?? internalFilters;
+
   const debouncedSearch = useDebounce(filters.search || '', 300);
 
   useEffect(() => {
@@ -23,6 +25,7 @@ export function useSearch(tools: Tool[]) {
       const timer = setTimeout(() => setIsLoading(false), 200);
       return () => clearTimeout(timer);
     }
+    setIsLoading(false);
   }, [debouncedSearch]);
 
   const filteredTools = useMemo(() => {
@@ -30,11 +33,11 @@ export function useSearch(tools: Tool[]) {
   }, [tools, filters, debouncedSearch]);
 
   const updateFilter = (key: keyof FilterOptions, value: any) => {
-    setFilters((prev) => ({ ...prev, [key]: value }));
+    setInternalFilters((prev) => ({ ...prev, [key]: value }));
   };
 
   const resetFilters = () => {
-    setFilters({
+    setInternalFilters({
       category: 'all',
       tags: [],
       price: [],

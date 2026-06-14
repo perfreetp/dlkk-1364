@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate, createSearchParams } from 'react-router-dom';
 import {
   Sparkles,
   Clock,
@@ -36,6 +36,7 @@ const categoryIcons: Record<string, React.ReactNode> = {
 };
 
 export default function Home() {
+  const navigate = useNavigate();
   const tools = useToolStore((state) => state.tools);
   const getRecentTools = useToolStore((state) => state.getRecentTools);
   const collections = useCollectionStore((state) => state.collections);
@@ -54,12 +55,18 @@ export default function Home() {
 
   const handleCategoryClick = (categoryId: string) => {
     setFilters({ category: categoryId });
-    window.location.href = '/library';
+    navigate({
+      pathname: '/library',
+      search: `?${createSearchParams({ category: categoryId })}`,
+    });
   };
 
   const handleTagClick = (tag: string) => {
     setFilters({ tags: [tag] });
-    window.location.href = '/library';
+    navigate({
+      pathname: '/library',
+      search: `?${createSearchParams({ tags: tag })}`,
+    });
   };
 
   const tagColors = ['blue', 'green', 'amber', 'purple', 'cyan', 'pink'];

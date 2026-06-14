@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { X, Upload, Link2, Tag, AlertCircle } from 'lucide-react';
+import React, { useState, useRef, useMemo, useEffect } from 'react';
+import { X, Upload, Link2, Tag, AlertCircle, Image, Search, ChevronDown, Check } from 'lucide-react';
 import { Button } from '@/components/common/Button';
 import { Input, TextArea, Select } from '@/components/common/Input';
 import { TagBadge } from '@/components/common/TagBadge';
@@ -41,13 +41,73 @@ export const ToolForm: React.FC<ToolFormProps> = ({
   const [screenshotUrl, setScreenshotUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [screenshotUploading, setScreenshotUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const addTool = useToolStore((state) => state.addTool);
+  const updateTool = useToolStore((state) => state.updateTool);
   const checkForDuplicate = useToolStore((state) => state.checkForDuplicate);
   const getAllTags = useCollectionStore((state) => state.getAllTags);
   const showToast = useUIStore((state) => state.showToast);
+  const tools = useToolStore((state) => state.tools);
 
   const allTags = getAllTags();
+
+  const [altSearchQuery, setAltSearchQuery] = useState('');
+  const [altDropdownOpen, setAltDropdownOpen] = useState(false);
+  const altDropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (altDropdownRef.current && !altDropdownRef.current.contains(e.target as Node)) {
+        setAltDropdownOpen(false);
+      }
+    };
+    if (altDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [altDropdownOpen]);
+
+  const alternativeTools = useMemo(() => {
+    const currentId = initialData?.id;
+    const filtered = tools.filter((t) => t.id !== currentId);
+    if (!altSearchQuery.trim()) return filtered.slice(0, 50);
+    const q = altSearchQuery.toLowerCase();
+    return filtered
+      .filter(
+        (t) =>
+          t.name.toLowerCase().includes(q) ||
+          t.description.toLowerCase().includes(q) ||
+          t.tags.some((tag) => tag.toLowerCase().includes(q))
+      )
+      .slice(0, 50);
+  }, [tools, altSearchQuery, initialData?.id]);
+
+  const selectedAltNames = useMemo(() => {
+    return formData.alternatives
+      .map((id) => tools.find((t) => t.id === id)?.name)
+      .filter(Boolean) as string[];
+  }, [formData.alternatives, tools]);
+
+  const handleToggleAlternative = (toolId: string) => {
+    setFormData((prev) => {
+      const exists = prev.alternatives.includes(toolId);
+      return {
+        ...prev,
+        alternatives: exists
+          ? prev.alternatives.filter((id) => id !== toolId)
+          : [...prev.alternatives, toolId],
+      };
+    });
+  };
+
+  const handleRemoveAlternative = (toolId: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      alternatives: prev.alternatives.filter((id) => id !== toolId),
+    }));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -73,30 +133,50 @@ export const ToolForm: React.FC<ToolFormProps> = ({
       .map((l) => l.trim())
       .filter(Boolean);
 
-    const result = await addTool({
-      name: formData.name.trim(),
-      url: formData.url.trim(),
-      description: formData.description.trim(),
-      category: formData.category,
-      tags: formData.tags,
-      price: formData.price,
-      priceInfo: formData.priceInfo.trim() || undefined,
-      limitations: limitations.length > 0 ? limitations : undefined,
-      screenshots: formData.screenshots,
-      alternatives: formData.alternatives,
-    });
-
-    setLoading(false);
-
-    if (result.success) {
-      showToast(`${formData.name} 添加成功！`, 'success');
+    if (initialData?.id) {
+      updateTool(initialData.id, {
+        name: formData.name.trim(),
+        url: formData.url.trim(),
+        description: formData.description.trim(),
+        category: formData.category,
+        tags: formData.tags,
+        price: formData.price,
+        priceInfo: formData.priceInfo.trim() || undefined,
+        limitations: limitations.length > 0 ? limitations : undefined,
+        screenshots: formData.screenshots,
+        alternatives: formData.alternatives,
+      });
+      setLoading(false);
+      showToast(`${formData.name} 修改成功！`, 'success');
       handleReset();
       onSuccess?.();
       onClose?.();
-    } else if (result.duplicate) {
-      showToast(`该链接已收藏：${result.tool?.name}`, 'error');
     } else {
-      showToast('添加失败，请重试', 'error');
+      const result = await addTool({
+        name: formData.name.trim(),
+        url: formData.url.trim(),
+        description: formData.description.trim(),
+        category: formData.category,
+        tags: formData.tags,
+        price: formData.price,
+        priceInfo: formData.priceInfo.trim() || undefined,
+        limitations: limitations.length > 0 ? limitations : undefined,
+        screenshots: formData.screenshots,
+        alternatives: formData.alternatives,
+      });
+
+      setLoading(false);
+
+      if (result.success) {
+        showToast(`${formData.name} 添加成功！`, 'success');
+        handleReset();
+        onSuccess?.();
+        onClose?.();
+      } else if (result.duplicate) {
+        showToast(`该链接已收藏：${result.tool?.name}`, 'error');
+      } else {
+        showToast('添加失败，请重试', 'error');
+      }
     }
   };
 
@@ -148,6 +228,54 @@ export const ToolForm: React.FC<ToolFormProps> = ({
         ],
       }));
       setScreenshotUrl('');
+    }
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    setScreenshotUploading(true);
+    
+    const validTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'image/gif'];
+    const maxSize = 5 * 1024 * 1024;
+
+    Array.from(files).forEach((file) => {
+      if (!validTypes.includes(file.type)) {
+        showToast(`${file.name} 格式不支持，请上传 PNG/JPG/WebP/GIF 图片`, 'error');
+        return;
+      }
+      if (file.size > maxSize) {
+        showToast(`${file.name} 超过5MB限制`, 'error');
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const dataUrl = event.target?.result as string;
+        if (dataUrl) {
+          setFormData((prev) => ({
+            ...prev,
+            screenshots: [
+              ...prev.screenshots,
+              {
+                id: generateId(),
+                url: dataUrl,
+                uploadedAt: Date.now(),
+              },
+            ],
+          }));
+        }
+      };
+      reader.onerror = () => {
+        showToast(`${file.name} 读取失败`, 'error');
+      };
+      reader.readAsDataURL(file);
+    });
+
+    setScreenshotUploading(false);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
     }
   };
 
@@ -326,9 +454,9 @@ export const ToolForm: React.FC<ToolFormProps> = ({
           <label className="block text-sm font-medium text-gray-700 mb-1.5">
             截图
           </label>
-          <div className="grid grid-cols-3 gap-3 mb-2">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
             {formData.screenshots.map((ss) => (
-              <div key={ss.id} className="relative aspect-video rounded-lg overflow-hidden bg-gray-100">
+              <div key={ss.id} className="relative aspect-video rounded-lg overflow-hidden bg-gray-100 border border-gray-200">
                 <img src={ss.url} alt="" className="w-full h-full object-cover" />
                 <button
                   type="button"
@@ -339,7 +467,29 @@ export const ToolForm: React.FC<ToolFormProps> = ({
                 </button>
               </div>
             ))}
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="aspect-video rounded-lg border-2 border-dashed border-gray-300 hover:border-brand-500 hover:bg-brand-50 flex flex-col items-center justify-center text-gray-500 hover:text-brand-600 transition-colors"
+            >
+              {screenshotUploading ? (
+                <div className="w-6 h-6 border-2 border-brand-200 border-t-brand-600 rounded-full animate-spin" />
+              ) : (
+                <>
+                  <Image className="w-6 h-6 mb-1" />
+                  <span className="text-xs font-medium">上传图片</span>
+                </>
+              )}
+            </button>
           </div>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/png,image/jpeg,image/jpg,image/webp,image/gif"
+            multiple
+            onChange={handleFileUpload}
+            className="hidden"
+          />
           <div className="flex gap-2">
             <Input
               value={screenshotUrl}
@@ -350,10 +500,113 @@ export const ToolForm: React.FC<ToolFormProps> = ({
                   handleAddScreenshot();
                 }
               }}
-              placeholder="粘贴截图链接后按回车添加"
-              icon={<Upload className="w-4 h-4" />}
+              placeholder="或粘贴图片链接后按回车添加"
+              icon={<Link2 className="w-4 h-4" />}
             />
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={handleAddScreenshot}
+              disabled={!screenshotUrl.trim()}
+            >
+              添加
+            </Button>
           </div>
+          <p className="mt-2 text-xs text-gray-400">
+            支持 PNG/JPG/WebP/GIF 格式，单张图片不超过 5MB
+          </p>
+        </div>
+
+        <div ref={altDropdownRef} className="relative">
+          <label className="block text-sm font-medium text-gray-700 mb-1.5">
+            替代工具
+          </label>
+          <div className="flex flex-wrap gap-2 mb-2">
+            {formData.alternatives.map((altId) => {
+              const altTool = tools.find((t) => t.id === altId);
+              if (!altTool) return null;
+              return (
+                <span
+                  key={altId}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-brand-50 text-brand-700 rounded-lg text-sm font-medium"
+                >
+                  {altTool.name}
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveAlternative(altId)}
+                    className="ml-0.5 p-0.5 rounded hover:bg-brand-100 transition-colors"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </span>
+              );
+            })}
+          </div>
+          <div className="relative">
+            <div
+              onClick={() => setAltDropdownOpen((o) => !o)}
+              className="w-full px-4 py-2.5 pr-10 text-sm bg-white border border-gray-300 rounded-lg cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 flex items-center gap-2"
+            >
+              <Search className="w-4 h-4 text-gray-400 flex-shrink-0" />
+              <input
+                type="text"
+                value={altSearchQuery}
+                onChange={(e) => {
+                  setAltSearchQuery(e.target.value);
+                  setAltDropdownOpen(true);
+                }}
+                onFocus={() => setAltDropdownOpen(true)}
+                onClick={(e) => e.stopPropagation()}
+                placeholder="搜索已收藏的工具..."
+                className="flex-1 outline-none bg-transparent min-w-0"
+              />
+              <ChevronDown
+                className={`w-4 h-4 text-gray-400 flex-shrink-0 transition-transform ${altDropdownOpen ? 'rotate-180' : ''}`}
+              />
+            </div>
+            {altDropdownOpen && (
+              <div className="absolute z-20 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-xl max-h-64 overflow-y-auto">
+                {alternativeTools.length === 0 ? (
+                  <div className="px-4 py-6 text-center text-sm text-gray-500">
+                    没有找到匹配的工具
+                  </div>
+                ) : (
+                  alternativeTools.map((tool) => {
+                    const isSelected = formData.alternatives.includes(tool.id);
+                    return (
+                      <button
+                        key={tool.id}
+                        type="button"
+                        onClick={() => handleToggleAlternative(tool.id)}
+                        className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-gray-50 transition-colors"
+                      >
+                        <div
+                          className={`w-4 h-4 rounded border-2 flex-shrink-0 flex items-center justify-center transition-colors ${
+                            isSelected
+                              ? 'bg-brand-600 border-brand-600'
+                              : 'border-gray-300'
+                          }`}
+                        >
+                          {isSelected && <Check className="w-3 h-3 text-white" />}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium text-gray-900 truncate">
+                            {tool.name}
+                          </div>
+                          <div className="text-xs text-gray-500 truncate line-clamp-1">
+                            {tool.description}
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            )}
+          </div>
+          <p className="mt-2 text-xs text-gray-400">
+            选择功能类似或互为替代的工具，便于对比参考
+          </p>
         </div>
       </form>
     </Modal>

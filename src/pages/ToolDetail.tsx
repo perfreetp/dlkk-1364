@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
   ExternalLink,
   Star,
@@ -22,6 +22,7 @@ import { Card } from '@/components/common/Card';
 import { Rating } from '@/components/common/Rating';
 import { TagBadge } from '@/components/common/TagBadge';
 import { CollectionSelector } from '@/components/business/CollectionSelector';
+import { ToolForm } from '@/components/business/ToolForm';
 import { Modal } from '@/components/common/Modal';
 import { Input, TextArea } from '@/components/common/Input';
 import { Empty } from '@/components/Empty';
@@ -29,13 +30,15 @@ import { useToolStore } from '@/store/useToolStore';
 import { useCollectionStore } from '@/store/useCollectionStore';
 import { useUIStore } from '@/store/useUIStore';
 import { CATEGORIES, PRICE_COLORS, PRICE_LABELS } from '@/types';
-import type { Note, Review } from '@/types';
+import type { Note, Review, Tool } from '@/types';
 import { cn } from '@/lib/utils';
 
 export default function ToolDetail() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [showNoteModal, setShowNoteModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [newRating, setNewRating] = useState(0);
   const [newReview, setNewReview] = useState('');
   const [newNote, setNewNote] = useState('');
@@ -49,6 +52,7 @@ export default function ToolDetail() {
   const addNote = useToolStore((state) => state.addNote);
   const updateNote = useToolStore((state) => state.updateNote);
   const deleteNote = useToolStore((state) => state.deleteNote);
+  const deleteTool = useToolStore((state) => state.deleteTool);
   const markAsUsed = useToolStore((state) => state.markAsUsed);
   const addToCompare = useToolStore((state) => state.addToCompare);
   const compareList = useToolStore((state) => state.compareList);
@@ -160,6 +164,14 @@ export default function ToolDetail() {
     }
   };
 
+  const handleDelete = () => {
+    if (window.confirm(`确定要删除「${tool.name}」吗？此操作不可撤销。`)) {
+      deleteTool(tool.id);
+      showToast('工具已删除', 'info');
+      navigate('/library');
+    }
+  };
+
   const formatDate = (timestamp: number) => {
     return new Date(timestamp).toLocaleDateString('zh-CN', {
       year: 'numeric',
@@ -217,6 +229,13 @@ export default function ToolDetail() {
                 </div>
                 <div className="flex items-center gap-2">
                   <button
+                    onClick={() => setShowEditModal(true)}
+                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                    title="编辑工具"
+                  >
+                    <Edit3 className="w-4 h-4 text-gray-500" />
+                  </button>
+                  <button
                     onClick={handleCheckLink}
                     disabled={isCheckingLink}
                     className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
@@ -230,6 +249,13 @@ export default function ToolDetail() {
                     title="分享"
                   >
                     <Share2 className="w-4 h-4 text-gray-500" />
+                  </button>
+                  <button
+                    onClick={handleDelete}
+                    className="p-2 hover:bg-red-50 rounded-lg transition-colors"
+                    title="删除工具"
+                  >
+                    <Trash2 className="w-4 h-4 text-gray-500 hover:text-red-500" />
                   </button>
                 </div>
               </div>
@@ -606,6 +632,14 @@ export default function ToolDetail() {
           </div>
         </div>
       </Modal>
+
+      <ToolForm
+        isOpen={showEditModal}
+        onClose={() => setShowEditModal(false)}
+        onSuccess={() => setShowEditModal(false)}
+        onCancel={() => setShowEditModal(false)}
+        initialData={tool}
+      />
     </div>
   );
 }

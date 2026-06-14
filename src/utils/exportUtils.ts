@@ -79,9 +79,19 @@ export const generateShareContent = (
   tools: Tool[]
 ): string => {
   const collectionTools = tools.filter((t) => collection.toolIds.includes(t.id));
+  const getToolName = (id: string) => tools.find((t) => t.id === id)?.name || id;
+
   const toolList = collectionTools
-    .map((t, i) => `${i + 1}. ${t.name} - ${t.url}`)
-    .join('\n');
+    .map((t, i) => {
+      let line = `${i + 1}. ${t.name} - ${t.url}`;
+      if (t.description) line += `\n   ${t.description}`;
+      if (t.alternatives && t.alternatives.length > 0) {
+        const altNames = t.alternatives.map(getToolName).join('、');
+        line += `\n   🔄 替代工具：${altNames}`;
+      }
+      return line;
+    })
+    .join('\n\n');
 
   return `📦 ${collection.name}\n${collection.description}\n\n${toolList}`;
 };

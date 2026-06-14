@@ -93,6 +93,13 @@ export default function Compare() {
   };
 
   const generateCompareReport = () => {
+    const getAltNames = (tool: Tool) => {
+      if (!tool.alternatives || tool.alternatives.length === 0) return '-';
+      return tool.alternatives
+        .map((id) => getToolById(id)?.name || id)
+        .join('、');
+    };
+
     let report = `# 工具对比报告\n\n`;
     report += `生成时间：${new Date().toLocaleString('zh-CN')}\n\n`;
     report += `## 对比工具列表\n\n`;
@@ -107,6 +114,7 @@ export default function Compare() {
     report += `| 价格 | ${compareTools.map((t) => PRICE_LABELS[t.price]).join(' | ')} |\n`;
     report += `| 链接状态 | ${compareTools.map((t) => t.isLinkValid ? '✅ 正常' : '❌ 失效').join(' | ')} |\n`;
     report += `| 标签 | ${compareTools.map((t) => t.tags.join(', ') || '-').join(' | ')} |\n`;
+    report += `| 替代工具 | ${compareTools.map(getAltNames).join(' | ')} |\n`;
     report += `\n## 工具详情\n\n`;
     compareTools.forEach((tool) => {
       report += `### ${tool.name}\n\n`;
@@ -119,6 +127,15 @@ export default function Compare() {
       if (tool.limitations && tool.limitations.length > 0) {
         report += `- 使用限制：\n`;
         tool.limitations.forEach((lim) => report += `  - ${lim}\n`);
+      }
+      if (tool.alternatives && tool.alternatives.length > 0) {
+        report += `- 替代工具：\n`;
+        tool.alternatives.forEach((altId) => {
+          const altTool = getToolById(altId);
+          if (altTool) {
+            report += `  - [${altTool.name}](${altTool.url}) - ${altTool.description}\n`;
+          }
+        });
       }
       report += `\n`;
     });
@@ -134,6 +151,7 @@ export default function Compare() {
     { key: 'priceInfo', label: '价格说明' },
     { key: 'limitations', label: '使用限制' },
     { key: 'tags', label: '标签' },
+    { key: 'alternatives', label: '替代工具' },
     { key: 'isLinkValid', label: '链接状态' },
     { key: 'createdAt', label: '添加时间' },
   ];
@@ -179,6 +197,29 @@ export default function Compare() {
           </div>
         ) : (
           '-'
+        );
+      case 'alternatives':
+        if (!tool.alternatives || tool.alternatives.length === 0) return '-';
+        return (
+          <div className="space-y-1">
+            {tool.alternatives.slice(0, 2).map((altId) => {
+              const altTool = getToolById(altId);
+              if (!altTool) return null;
+              return (
+                <Link
+                  key={altId}
+                  to={`/tool/${altId}`}
+                  className="block text-sm text-brand-600 hover:text-brand-700 hover:underline truncate"
+                  title={altTool.description}
+                >
+                  {altTool.name}
+                </Link>
+              );
+            })}
+            {tool.alternatives.length > 2 && (
+              <span className="text-xs text-gray-400">+{tool.alternatives.length - 2} 个更多</span>
+            )}
+          </div>
         );
       case 'isLinkValid':
         return (

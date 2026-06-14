@@ -75,7 +75,7 @@ export default function CollectionDetail() {
         .filter((t): t is Tool => t !== undefined)
     : [];
 
-  const { filteredTools, isLoading } = useSearch(collectionTools);
+  const { filteredTools, isLoading } = useSearch(collectionTools, filters);
 
   const availableTools = tools.filter(
     (t) =>

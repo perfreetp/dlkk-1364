@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate, createSearchParams } from 'react-router-dom';
 import {
   LayoutGrid,
   Palette,
@@ -43,7 +43,10 @@ export const Sidebar: React.FC = () => {
 
   const handleCategoryClick = (categoryId: CategoryType) => {
     setFilters({ category: categoryId });
-    navigate('/library');
+    navigate({
+      pathname: '/library',
+      search: `?${createSearchParams({ category: categoryId })}`,
+    });
   };
 
   const getToolCountForCategory = (categoryId: string) => {
