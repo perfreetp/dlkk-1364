@@ -96,6 +96,39 @@ export interface FilterOptions {
   sortOrder?: 'asc' | 'desc';
 }
 
+export interface FilterPreset {
+  id: string;
+  name: string;
+  filters: FilterOptions;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface SharedCollection {
+  shareToken: string;
+  collection: {
+    name: string;
+    description: string;
+  };
+  tools: Array<{
+    id: string;
+    name: string;
+    url: string;
+    description: string;
+    category: string;
+    tags: string[];
+    price: 'free' | 'freemium' | 'paid';
+    priceInfo?: string;
+    limitations?: string[];
+    screenshots: Array<{ id: string; url: string; caption?: string }>;
+    rating: number;
+    reviewCount: number;
+    alternatives: Array<{ id: string; name: string; description: string; rating: number }>;
+    createdAt: number;
+  }>;
+  createdAt: number;
+}
+
 export type CategoryType = 
   | 'all'
   | 'design'

@@ -69,6 +69,7 @@ export default function Profile() {
   const deleteCollection = useCollectionStore((state) => state.deleteCollection);
   const removeToolFromCollection = useCollectionStore((state) => state.removeToolFromCollection);
   const shareCollection = useCollectionStore((state) => state.shareCollection);
+  const shareCollectionAsLink = useCollectionStore((state) => state.shareCollectionAsLink);
   const exportAll = useCollectionStore((state) => state.exportAll);
   const importTools = useCollectionStore((state) => state.importTools);
 
@@ -128,9 +129,9 @@ export default function Profile() {
   };
 
   const handleShareCollection = async (collectionId: string) => {
-    const success = await shareCollection(collectionId);
-    if (success) {
-      showToast('分享内容已复制到剪贴板', 'success');
+    const result = await shareCollectionAsLink(collectionId);
+    if (result.success) {
+      showToast('分享链接已复制到剪贴板', 'success');
     } else {
       showToast('分享失败', 'error');
     }

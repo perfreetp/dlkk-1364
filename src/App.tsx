@@ -6,6 +6,7 @@ import ToolDetail from "@/pages/ToolDetail";
 import Compare from "@/pages/Compare";
 import Profile from "@/pages/Profile";
 import CollectionDetail from "@/pages/CollectionDetail";
+import Share from "@/pages/Share";
 
 export default function App() {
   return (
@@ -18,6 +19,7 @@ export default function App() {
           <Route path="/compare" element={<Compare />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/collection/:id" element={<CollectionDetail />} />
+          <Route path="/share/:token" element={<Share />} />
           <Route path="*" element={
             <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
               <h1 className="text-6xl font-bold text-gray-300 mb-4">404</h1>

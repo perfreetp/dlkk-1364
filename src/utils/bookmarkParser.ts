@@ -5,7 +5,104 @@ export interface ParsedBookmark {
   folder: string;
   description?: string;
   addDate?: number;
+  category?: string;
+  tags?: string[];
+  price?: string;
+  rating?: number;
+  reviewCount?: number;
+  alternatives?: string[];
+  priceInfo?: string;
+  limitations?: string[];
 }
+
+const parseDDContent = (content: string): {
+  description?: string;
+  category?: string;
+  tags?: string[];
+  price?: string;
+  rating?: number;
+  reviewCount?: number;
+  alternatives?: string[];
+  priceInfo?: string;
+  limitations?: string[];
+} => {
+  const parts = content.split('|||').map(p => p.trim());
+  
+  if (parts.length === 1) {
+    const altMatch = content.match(/[|｜]?\s*替代工具[：:]\s*(.+)$/);
+    if (altMatch) {
+      const altNamesStr = altMatch[1].trim();
+      const alternatives = altNamesStr.split(/[、,，]/).map((s) => s.trim()).filter(Boolean);
+      let description = content.replace(altMatch[0], '').trim();
+      if (description.endsWith('|') || description.endsWith('｜')) {
+        description = description.slice(0, -1).trim();
+      }
+      return { description: description || undefined, alternatives };
+    }
+    return { description: content.trim() || undefined };
+  }
+  
+  const result: ReturnType<typeof parseDDContent> = {};
+  
+  for (let i = 0; i < parts.length; i++) {
+    const part = parts[i];
+    if (i === 0 && !part.includes(':')) {
+      result.description = part || undefined;
+      continue;
+    }
+    
+    const colonIndex = part.indexOf(':');
+    if (colonIndex === -1) continue;
+    
+    const key = part.slice(0, colonIndex).trim();
+    const value = part.slice(colonIndex + 1).trim();
+    
+    switch (key) {
+      case '分类':
+        result.category = value || undefined;
+        break;
+      case '标签':
+        if (value) {
+          result.tags = value.split(',').map(t => t.trim()).filter(Boolean);
+        }
+        break;
+      case '价格':
+        result.price = value || undefined;
+        break;
+      case '评分':
+        if (value) {
+          const rating = parseFloat(value);
+          if (!isNaN(rating)) {
+            result.rating = rating;
+          }
+        }
+        break;
+      case '评价数':
+        if (value) {
+          const reviewCount = parseInt(value, 10);
+          if (!isNaN(reviewCount)) {
+            result.reviewCount = reviewCount;
+          }
+        }
+        break;
+      case '替代工具':
+        if (value) {
+          result.alternatives = value.split(',').map(a => a.trim()).filter(Boolean);
+        }
+        break;
+      case '价格说明':
+        result.priceInfo = value || undefined;
+        break;
+      case '使用限制':
+        if (value) {
+          result.limitations = value.split(';').map(l => l.trim()).filter(Boolean);
+        }
+        break;
+    }
+  }
+  
+  return result;
+};
 
 export const parseBookmarksHTML = (html: string): ParsedBookmark[] => {
   const parser = new DOMParser();
@@ -32,9 +129,30 @@ export const parseBookmarksHTML = (html: string): ParsedBookmark[] => {
           const addDate = addDateStr ? parseInt(addDateStr, 10) * 1000 : undefined;
 
           let description: string | undefined;
+          let category: string | undefined;
+          let tags: string[] | undefined;
+          let price: string | undefined;
+          let rating: number | undefined;
+          let reviewCount: number | undefined;
+          let alternatives: string[] | undefined;
+          let priceInfo: string | undefined;
+          let limitations: string[] | undefined;
+          
           const nextSibling = child.nextElementSibling;
           if (nextSibling && nextSibling.tagName === 'DD') {
-            description = nextSibling.textContent?.trim() || undefined;
+            const ddContent = nextSibling.textContent?.trim() || '';
+            if (ddContent) {
+              const parsed = parseDDContent(ddContent);
+              description = parsed.description;
+              category = parsed.category;
+              tags = parsed.tags;
+              price = parsed.price;
+              rating = parsed.rating;
+              reviewCount = parsed.reviewCount;
+              alternatives = parsed.alternatives;
+              priceInfo = parsed.priceInfo;
+              limitations = parsed.limitations;
+            }
           }
 
           if (url && url.startsWith('http')) {
@@ -45,6 +163,14 @@ export const parseBookmarksHTML = (html: string): ParsedBookmark[] => {
               folder: currentFolder,
               description,
               addDate,
+              category,
+              tags,
+              price,
+              rating,
+              reviewCount,
+              alternatives,
+              priceInfo,
+              limitations,
             });
           }
         }

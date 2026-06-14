@@ -42,6 +42,7 @@ export default function CollectionDetail() {
   const removeToolFromCollection = useCollectionStore((state) => state.removeToolFromCollection);
   const addToolToCollection = useCollectionStore((state) => state.addToolToCollection);
   const shareCollection = useCollectionStore((state) => state.shareCollection);
+  const shareCollectionAsLink = useCollectionStore((state) => state.shareCollectionAsLink);
   const exportCollection = useCollectionStore((state) => state.exportCollection);
 
   const tools = useToolStore((state) => state.tools);
@@ -132,9 +133,9 @@ export default function CollectionDetail() {
   };
 
   const handleShare = async () => {
-    const success = await shareCollection(collection.id);
-    if (success) {
-      showToast('分享内容已复制到剪贴板', 'success');
+    const result = await shareCollectionAsLink(collection.id);
+    if (result.success && result.url) {
+      showToast('分享链接已复制到剪贴板', 'success');
     } else {
       showToast('分享失败', 'error');
     }
@@ -216,8 +217,24 @@ export default function CollectionDetail() {
                 className="bg-white/10 text-white hover:bg-white/20 border-0"
                 leftIcon={<Share2 className="w-4 h-4" />}
               >
-                分享
+                复制链接
               </Button>
+              {collection.shareToken && (
+                <Link
+                  to={`/share/${collection.shareToken}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="bg-white/10 text-white hover:bg-white/20 border-0"
+                    leftIcon={<ExternalLink className="w-4 h-4" />}
+                  >
+                    打开分享页
+                  </Button>
+                </Link>
+              )}
               <Button
                 variant="secondary"
                 size="sm"

@@ -24,6 +24,7 @@ const colorMap: Record<string, string> = {
   orange: 'bg-orange-100 text-orange-700 hover:bg-orange-200',
   teal: 'bg-teal-100 text-teal-700 hover:bg-teal-200',
   indigo: 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200',
+  gray: 'bg-gray-100 text-gray-700 hover:bg-gray-200',
 };
 
 export const TagBadge: React.FC<TagBadgeProps> = ({

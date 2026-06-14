@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { Collection, Tag } from '@/types';
+import type { Collection, Tag, Tool } from '@/types';
 import { generateId } from '@/utils/idGenerator';
 import { createShareToken, copyToClipboard, generateShareContent, exportToJSON, exportToBookmarksHTML, downloadFile } from '@/utils/exportUtils';
 import { useToolStore } from './useToolStore';
@@ -16,11 +16,14 @@ interface CollectionState {
   removeToolFromCollection: (collectionId: string, toolId: string) => void;
   getCollectionById: (id: string) => Collection | undefined;
   getCollectionsForTool: (toolId: string) => Collection[];
+  getSharedCollection: (shareToken: string) => { collection: Collection; tools: Tool[] } | null;
+  getToolById: (id: string) => Tool | undefined;
   generateShareLink: (collectionId: string) => string;
   shareCollection: (collectionId: string) => Promise<boolean>;
+  shareCollectionAsLink: (collectionId: string) => Promise<{ success: boolean; url?: string }>;
   exportCollection: (collectionId: string, format: 'json' | 'html') => void;
   exportAll: (format: 'json' | 'html') => void;
-  importTools: (tools: Array<{ name: string; title?: string; url: string; description?: string; folder?: string }>) => Promise<number>;
+  importTools: (tools: Array<{ name: string; title?: string; url: string; description?: string; folder?: string; category?: string; tags?: string[]; price?: string; rating?: number; reviewCount?: number; alternatives?: string[]; priceInfo?: string; limitations?: string[] }>) => Promise<number>;
   addTag: (name: string, color: string) => Tag;
   getAllTags: () => string[];
 }
@@ -89,6 +92,22 @@ export const useCollectionStore = create<CollectionState>()(
         return get().collections.filter((c) => c.toolIds.includes(toolId));
       },
 
+      getSharedCollection: (shareToken) => {
+        const collection = get().collections.find(
+          (c) => c.shareToken === shareToken && c.isPublic
+        );
+        if (!collection) return null;
+
+        const tools = useToolStore.getState().tools.filter((t) =>
+          collection.toolIds.includes(t.id)
+        );
+        return { collection, tools };
+      },
+
+      getToolById: (id) => {
+        return useToolStore.getState().tools.find((t) => t.id === id);
+      },
+
       generateShareLink: (collectionId) => {
         const collection = get().getCollectionById(collectionId);
         if (!collection) return '';
@@ -108,6 +127,20 @@ export const useCollectionStore = create<CollectionState>()(
         const tools = useToolStore.getState().tools;
         const content = generateShareContent(collection, tools);
         return copyToClipboard(content);
+      },
+
+      shareCollectionAsLink: async (collectionId) => {
+        const collection = get().getCollectionById(collectionId);
+        if (!collection) return { success: false };
+
+        const shareToken = collection.shareToken || createShareToken();
+        if (!collection.shareToken) {
+          get().updateCollection(collectionId, { shareToken, isPublic: true });
+        }
+
+        const url = `${window.location.origin}/share/${shareToken}`;
+        const copied = await copyToClipboard(url);
+        return { success: copied, url };
       },
 
       exportCollection: (collectionId, format) => {
@@ -142,15 +175,15 @@ export const useCollectionStore = create<CollectionState>()(
       },
 
       importTools: async (bookmarks) => {
-        const { addTool, checkForDuplicate } = useToolStore.getState();
+        const { addTool, checkForDuplicate, updateTool } = useToolStore.getState();
         let importedCount = 0;
 
         for (const bookmark of bookmarks) {
           const duplicate = checkForDuplicate(bookmark.url);
           if (duplicate) continue;
 
-          let category = 'other';
-          if (bookmark.folder) {
+          let category = bookmark.category;
+          if (!category && bookmark.folder) {
             const folderLower = bookmark.folder.toLowerCase();
             if (folderLower.includes('design') || folderLower.includes('设计')) category = 'design';
             else if (folderLower.includes('dev') || folderLower.includes('开发') || folderLower.includes('code')) category = 'development';
@@ -159,11 +192,22 @@ export const useCollectionStore = create<CollectionState>()(
             else if (folderLower.includes('data') || folderLower.includes('数据')) category = 'data';
             else if (folderLower.includes('ai') || folderLower.includes('人工智能')) category = 'ai';
           }
+          if (!category) category = 'other';
+
+          const validCategories = ['design', 'development', 'productivity', 'marketing', 'data', 'ai', 'other'];
+          if (!validCategories.includes(category)) {
+            category = 'other';
+          }
 
           let description = bookmark.description || '';
           let alternatives: string[] = [];
 
-          if (description) {
+          if (bookmark.alternatives && bookmark.alternatives.length > 0) {
+            const currentTools = useToolStore.getState().tools;
+            alternatives = bookmark.alternatives
+              .map((name) => currentTools.find((t) => t.name === name)?.id)
+              .filter((id): id is string => !!id);
+          } else if (description) {
             const altMatch = description.match(/[|｜]?\s*替代工具[：:]\s*(.+)$/);
             if (altMatch) {
               const altNamesStr = altMatch[1].trim();
@@ -179,18 +223,37 @@ export const useCollectionStore = create<CollectionState>()(
             }
           }
 
+          let price: 'free' | 'freemium' | 'paid' = 'free';
+          if (bookmark.price === 'free' || bookmark.price === 'freemium' || bookmark.price === 'paid') {
+            price = bookmark.price;
+          }
+
           const result = await addTool({
             name: bookmark.name || bookmark.title || bookmark.url,
             url: bookmark.url,
             description,
             category,
-            tags: [],
-            price: 'free',
+            tags: bookmark.tags || [],
+            price,
+            priceInfo: bookmark.priceInfo,
+            limitations: bookmark.limitations,
             screenshots: [],
             alternatives,
           });
 
-          if (result.success) {
+          if (result.success && result.tool) {
+            if ((bookmark.rating !== undefined && bookmark.rating !== null) || 
+                (bookmark.reviewCount !== undefined && bookmark.reviewCount !== null)) {
+              const updates: Partial<Tool> = {};
+              if (bookmark.rating !== undefined && bookmark.rating !== null) {
+                updates.rating = bookmark.rating;
+              }
+              if (bookmark.reviewCount !== undefined && bookmark.reviewCount !== null) {
+                updates.reviewCount = bookmark.reviewCount;
+              }
+              updateTool(result.tool.id, updates);
+            }
+
             importedCount++;
 
             if (bookmark.folder) {
@@ -204,9 +267,7 @@ export const useCollectionStore = create<CollectionState>()(
                   isPublic: false,
                 });
               }
-              if (result.tool) {
-                get().addToolToCollection(collection.id, result.tool.id);
-              }
+              get().addToolToCollection(collection.id, result.tool.id);
             }
           }
         }

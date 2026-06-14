@@ -42,7 +42,6 @@ export default function Home() {
   const collections = useCollectionStore((state) => state.collections);
   const getAllTags = useCollectionStore((state) => state.getAllTags);
   const openAddToolModal = useUIStore((state) => state.openAddToolModal);
-  const setFilters = useUIStore((state) => state.setFilters);
 
   const recentTools = getRecentTools(6);
   const topRatedTools = [...tools].sort((a, b) => b.rating - a.rating).slice(0, 6);
@@ -54,7 +53,6 @@ export default function Home() {
   };
 
   const handleCategoryClick = (categoryId: string) => {
-    setFilters({ category: categoryId });
     navigate({
       pathname: '/library',
       search: `?${createSearchParams({ category: categoryId })}`,
@@ -62,7 +60,6 @@ export default function Home() {
   };
 
   const handleTagClick = (tag: string) => {
-    setFilters({ tags: [tag] });
     navigate({
       pathname: '/library',
       search: `?${createSearchParams({ tags: tag })}`,

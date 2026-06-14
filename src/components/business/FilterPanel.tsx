@@ -1,9 +1,10 @@
-import React from 'react';
-import { Search, SlidersHorizontal, X, Grid3X3, List, Star } from 'lucide-react';
+import React, { useState } from 'react';
+import { Search, SlidersHorizontal, X, Grid3X3, List, Star, BookmarkPlus, Save, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/common/Input';
 import { TagBadge } from '@/components/common/TagBadge';
 import { Button } from '@/components/common/Button';
+import { Modal } from '@/components/common/Modal';
 import type { FilterOptions, Tool } from '@/types';
 import { CATEGORIES, PRICE_LABELS, PRICE_COLORS } from '@/types';
 import { useCollectionStore } from '@/store/useCollectionStore';
@@ -30,6 +31,18 @@ export const FilterPanel: React.FC<FilterPanelProps> = ({
 }) => {
   const getAllTags = useCollectionStore((state) => state.getAllTags);
   const toggleSidebar = useUIStore((state) => state.toggleSidebar);
+  const filterPresets = useUIStore((state) => state.filterPresets);
+  const saveFilterPreset = useUIStore((state) => state.saveFilterPreset);
+  const applyFilterPreset = useUIStore((state) => state.applyFilterPreset);
+  const deleteFilterPreset = useUIStore((state) => state.deleteFilterPreset);
+  const updateFilterPreset = useUIStore((state) => state.updateFilterPreset);
+  const showToast = useUIStore((state) => state.showToast);
+
+  const [showPresetModal, setShowPresetModal] = useState(false);
+  const [presetName, setPresetName] = useState('');
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [editingPresetId, setEditingPresetId] = useState<string | null>(null);
+  const [hoveredPresetId, setHoveredPresetId] = useState<string | null>(null);
 
   const allTags = getAllTags();
   const tagColors = ['blue', 'green', 'amber', 'purple', 'cyan', 'pink', 'orange', 'teal'];
@@ -65,6 +78,58 @@ export const FilterPanel: React.FC<FilterPanelProps> = ({
     onFilterChange('price', newPrices);
   };
 
+  const handleOpenSaveModal = () => {
+    setPresetName('');
+    setEditingPresetId(null);
+    setShowPresetModal(true);
+  };
+
+  const handleSavePreset = () => {
+    if (!presetName.trim()) {
+      showToast('请输入方案名称', 'error');
+      return;
+    }
+    const existing = filterPresets.find((p) => p.name === presetName.trim());
+    if (existing) {
+      updateFilterPreset(existing.id);
+      showToast(`已更新方案「${presetName.trim()}」`, 'success');
+    } else {
+      saveFilterPreset(presetName.trim());
+      showToast(`已保存方案「${presetName.trim()}」`, 'success');
+    }
+    setShowPresetModal(false);
+    setPresetName('');
+  };
+
+  const handleApplyPreset = (presetId: string) => {
+    const preset = filterPresets.find((p) => p.id === presetId);
+    if (preset) {
+      applyFilterPreset(presetId);
+      Object.entries(preset.filters).forEach(([key, value]) => {
+        onFilterChange(key as keyof FilterOptions, value);
+      });
+      showToast(`已应用方案「${preset.name}」`, 'success');
+    }
+  };
+
+  const handleDeletePreset = (presetId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const preset = filterPresets.find((p) => p.id === presetId);
+    if (preset) {
+      deleteFilterPreset(presetId);
+      showToast(`已删除方案「${preset.name}」`, 'info');
+    }
+  };
+
+  const handleOverwritePreset = (presetId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const preset = filterPresets.find((p) => p.id === presetId);
+    if (preset) {
+      updateFilterPreset(presetId);
+      showToast(`已更新方案「${preset.name}」`, 'success');
+    }
+  };
+
   return (
     <div className="bg-white rounded-2xl border border-gray-200 p-5 mb-6">
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-5">
@@ -85,6 +150,14 @@ export const FilterPanel: React.FC<FilterPanelProps> = ({
         </div>
 
         <div className="flex items-center gap-3">
+          <Button
+            variant="ghost"
+            size="sm"
+            icon={<BookmarkPlus className="w-4 h-4" />}
+            onClick={handleOpenSaveModal}
+          >
+            保存筛选
+          </Button>
           {hasActiveFilters && (
             <Button
               variant="ghost"
@@ -124,6 +197,49 @@ export const FilterPanel: React.FC<FilterPanelProps> = ({
           </div>
         </div>
       </div>
+
+      {filterPresets.length > 0 && (
+        <div className="mb-4 pb-4 border-b border-gray-100">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider mr-2">
+              筛选方案
+            </span>
+            {filterPresets.map((preset, idx) => (
+              <div
+                key={preset.id}
+                className="relative inline-flex items-center group"
+                onMouseEnter={() => setHoveredPresetId(preset.id)}
+                onMouseLeave={() => setHoveredPresetId(null)}
+              >
+                <TagBadge
+                  label={preset.name}
+                  color={tagColors[idx % tagColors.length]}
+                  onClick={() => handleApplyPreset(preset.id)}
+                  className="pr-8"
+                />
+                {hoveredPresetId === preset.id && (
+                  <div className="absolute right-1 flex items-center gap-0.5">
+                    <button
+                      onClick={(e) => handleOverwritePreset(preset.id, e)}
+                      className="p-0.5 hover:bg-black/10 rounded transition-colors"
+                      title="覆盖更新"
+                    >
+                      <RefreshCw className="w-3 h-3" />
+                    </button>
+                    <button
+                      onClick={(e) => handleDeletePreset(preset.id, e)}
+                      className="p-0.5 hover:bg-black/10 rounded transition-colors"
+                      title="删除"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="space-y-4">
         <div className="flex flex-wrap items-center gap-2">
@@ -220,6 +336,52 @@ export const FilterPanel: React.FC<FilterPanelProps> = ({
           </select>
         </div>
       </div>
+
+      <Modal
+        isOpen={showPresetModal}
+        onClose={() => setShowPresetModal(false)}
+        title="保存筛选方案"
+        size="sm"
+        footer={
+          <>
+            <Button
+              variant="ghost"
+              onClick={() => setShowPresetModal(false)}
+            >
+              取消
+            </Button>
+            <Button
+              variant="primary"
+              icon={<Save className="w-4 h-4" />}
+              onClick={handleSavePreset}
+            >
+              保存
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600">
+            为当前筛选条件设置一个名称，方便以后快速使用。
+          </p>
+          <Input
+            value={presetName}
+            onChange={(e) => setPresetName(e.target.value)}
+            placeholder="请输入方案名称"
+            autoFocus
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                handleSavePreset();
+              }
+            }}
+          />
+          {filterPresets.some((p) => p.name === presetName.trim()) && (
+            <p className="text-sm text-amber-600">
+              ⚠️ 该名称已存在，将覆盖原有方案
+            </p>
+          )}
+        </div>
+      </Modal>
     </div>
   );
 };

@@ -23,14 +23,47 @@ export const exportToBookmarksHTML = (
 
   const formatBookmark = (tool: Tool): string => {
     let result = `            <DT><A HREF="${tool.url}" ADD_DATE="${now}">${tool.name}</A>`;
-    const descriptions: string[] = [];
-    if (tool.description) descriptions.push(tool.description);
-    if (tool.alternatives && tool.alternatives.length > 0) {
-      const altNames = tool.alternatives.map(getToolName).join('、');
-      descriptions.push(`替代工具：${altNames}`);
+    const fields: string[] = [];
+    
+    if (tool.description) {
+      fields.push(tool.description);
     }
-    if (descriptions.length > 0) {
-      result += `\n            <DD>${descriptions.join(' | ')}</DD>`;
+    
+    if (tool.category) {
+      fields.push(`分类:${tool.category}`);
+    }
+    
+    if (tool.tags && tool.tags.length > 0) {
+      fields.push(`标签:${tool.tags.join(',')}`);
+    }
+    
+    if (tool.price) {
+      fields.push(`价格:${tool.price}`);
+    }
+    
+    if (tool.rating !== undefined && tool.rating !== null) {
+      fields.push(`评分:${tool.rating}`);
+    }
+    
+    if (tool.reviewCount !== undefined && tool.reviewCount !== null) {
+      fields.push(`评价数:${tool.reviewCount}`);
+    }
+    
+    if (tool.alternatives && tool.alternatives.length > 0) {
+      const altNames = tool.alternatives.map(getToolName).join(',');
+      fields.push(`替代工具:${altNames}`);
+    }
+    
+    if (tool.priceInfo) {
+      fields.push(`价格说明:${tool.priceInfo}`);
+    }
+    
+    if (tool.limitations && tool.limitations.length > 0) {
+      fields.push(`使用限制:${tool.limitations.join(';')}`);
+    }
+    
+    if (fields.length > 0) {
+      result += `\n            <DD>${fields.join(' ||| ')}</DD>`;
     }
     return result;
   };
