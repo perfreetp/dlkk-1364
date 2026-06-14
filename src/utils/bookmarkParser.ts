@@ -13,6 +13,9 @@ export interface ParsedBookmark {
   alternatives?: string[];
   priceInfo?: string;
   limitations?: string[];
+  originalId?: string;
+  screenshots?: Array<{ url: string; caption?: string }>;
+  alternativesRaw?: string[];
 }
 
 const parseDDContent = (content: string): {
@@ -25,38 +28,75 @@ const parseDDContent = (content: string): {
   alternatives?: string[];
   priceInfo?: string;
   limitations?: string[];
+  originalId?: string;
+  screenshots?: Array<{ url: string; caption?: string }>;
+  alternativesRaw?: string[];
 } => {
   const parts = content.split('|||').map(p => p.trim());
-  
+
+  const parseAlternativesValue = (value: string): { alternatives: string[]; alternativesRaw: string[] } => {
+    const items = value.split(',').map(a => a.trim()).filter(Boolean);
+    const alternativesRaw: string[] = [];
+    const alternatives: string[] = [];
+    for (const item of items) {
+      alternativesRaw.push(item);
+      if (item.includes('|')) {
+        const name = item.split('|')[0].trim();
+        if (name) alternatives.push(name);
+      } else {
+        alternatives.push(item);
+      }
+    }
+    return { alternatives, alternativesRaw };
+  };
+
+  const parseScreenshotsValue = (value: string): Array<{ url: string; caption?: string }> => {
+    const items = value.split(',').map(s => s.trim()).filter(Boolean);
+    const screenshots: Array<{ url: string; caption?: string }> = [];
+    for (const item of items) {
+      if (item.includes('|')) {
+        const [urlPart, captionPart] = item.split('|');
+        const url = urlPart.trim();
+        const caption = captionPart?.trim();
+        if (url) {
+          screenshots.push({ url, caption: caption || undefined });
+        }
+      } else if (item) {
+        screenshots.push({ url: item });
+      }
+    }
+    return screenshots;
+  };
+
   if (parts.length === 1) {
     const altMatch = content.match(/[|｜]?\s*替代工具[：:]\s*(.+)$/);
     if (altMatch) {
       const altNamesStr = altMatch[1].trim();
-      const alternatives = altNamesStr.split(/[、,，]/).map((s) => s.trim()).filter(Boolean);
+      const { alternatives, alternativesRaw } = parseAlternativesValue(altNamesStr);
       let description = content.replace(altMatch[0], '').trim();
       if (description.endsWith('|') || description.endsWith('｜')) {
         description = description.slice(0, -1).trim();
       }
-      return { description: description || undefined, alternatives };
+      return { description: description || undefined, alternatives, alternativesRaw };
     }
     return { description: content.trim() || undefined };
   }
-  
+
   const result: ReturnType<typeof parseDDContent> = {};
-  
+
   for (let i = 0; i < parts.length; i++) {
     const part = parts[i];
     if (i === 0 && !part.includes(':')) {
       result.description = part || undefined;
       continue;
     }
-    
+
     const colonIndex = part.indexOf(':');
     if (colonIndex === -1) continue;
-    
+
     const key = part.slice(0, colonIndex).trim();
     const value = part.slice(colonIndex + 1).trim();
-    
+
     switch (key) {
       case '分类':
         result.category = value || undefined;
@@ -87,7 +127,9 @@ const parseDDContent = (content: string): {
         break;
       case '替代工具':
         if (value) {
-          result.alternatives = value.split(',').map(a => a.trim()).filter(Boolean);
+          const { alternatives, alternativesRaw } = parseAlternativesValue(value);
+          result.alternatives = alternatives;
+          result.alternativesRaw = alternativesRaw;
         }
         break;
       case '价格说明':
@@ -98,9 +140,17 @@ const parseDDContent = (content: string): {
           result.limitations = value.split(';').map(l => l.trim()).filter(Boolean);
         }
         break;
+      case '原始ID':
+        result.originalId = value || undefined;
+        break;
+      case '截图':
+        if (value) {
+          result.screenshots = parseScreenshotsValue(value);
+        }
+        break;
     }
   }
-  
+
   return result;
 };
 
@@ -137,7 +187,10 @@ export const parseBookmarksHTML = (html: string): ParsedBookmark[] => {
           let alternatives: string[] | undefined;
           let priceInfo: string | undefined;
           let limitations: string[] | undefined;
-          
+          let originalId: string | undefined;
+          let screenshots: Array<{ url: string; caption?: string }> | undefined;
+          let alternativesRaw: string[] | undefined;
+
           const nextSibling = child.nextElementSibling;
           if (nextSibling && nextSibling.tagName === 'DD') {
             const ddContent = nextSibling.textContent?.trim() || '';
@@ -152,6 +205,9 @@ export const parseBookmarksHTML = (html: string): ParsedBookmark[] => {
               alternatives = parsed.alternatives;
               priceInfo = parsed.priceInfo;
               limitations = parsed.limitations;
+              originalId = parsed.originalId;
+              screenshots = parsed.screenshots;
+              alternativesRaw = parsed.alternativesRaw;
             }
           }
 
@@ -171,6 +227,9 @@ export const parseBookmarksHTML = (html: string): ParsedBookmark[] => {
               alternatives,
               priceInfo,
               limitations,
+              originalId,
+              screenshots,
+              alternativesRaw,
             });
           }
         }

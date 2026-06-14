@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils';
 interface TagBadgeProps {
   label: string;
   color?: string;
-  size?: 'sm' | 'md';
+  size?: 'xs' | 'sm' | 'md';
   removable?: boolean;
   onRemove?: () => void;
   onClick?: () => void;
@@ -38,6 +38,7 @@ export const TagBadge: React.FC<TagBadgeProps> = ({
   className,
 }) => {
   const sizes = {
+    xs: 'px-1.5 py-0.5 text-[10px] gap-0.5',
     sm: 'px-2 py-0.5 text-xs gap-1',
     md: 'px-2.5 py-1 text-sm gap-1.5',
   };
@@ -68,7 +69,7 @@ export const TagBadge: React.FC<TagBadgeProps> = ({
           }}
           className="hover:bg-black/10 rounded-full p-0.5 transition-colors"
         >
-          <X className={cn(size === 'sm' ? 'w-3 h-3' : 'w-3.5 h-3.5')} />
+          <X className={cn(size === 'xs' || size === 'sm' ? 'w-3 h-3' : 'w-3.5 h-3.5')} />
         </button>
       )}
     </span>

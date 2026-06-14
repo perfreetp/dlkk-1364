@@ -12,6 +12,8 @@ export default function Library() {
   const [searchParams, setSearchParams] = useSearchParams();
   const isInitRef = useRef(true);
   const isSyncingRef = useRef(false);
+  const lastUrlRef = useRef('');
+  const filtersRef = useRef<FilterOptions | null>(null);
 
   const tools = useToolStore((state) => state.tools);
   const filters = useUIStore((state) => state.filters);
@@ -20,11 +22,16 @@ export default function Library() {
   const resetFilters = useUIStore((state) => state.resetFilters);
   const setViewMode = useUIStore((state) => state.setViewMode);
 
+  useEffect(() => {
+    filtersRef.current = filters;
+  }, [filters]);
+
   const { filteredTools, isLoading } = useSearch(tools, filters);
 
   useEffect(() => {
-    if (!isInitRef.current) return;
-    isInitRef.current = false;
+    const currentUrl = searchParams.toString();
+    if (isSyncingRef.current || currentUrl === lastUrlRef.current) return;
+    lastUrlRef.current = currentUrl;
 
     const paramsFromUrl: Partial<FilterOptions> = {};
     
@@ -46,7 +53,35 @@ export default function Library() {
     const sortBy = searchParams.get('sortBy');
     if (sortBy) paramsFromUrl.sortBy = sortBy as FilterOptions['sortBy'];
 
-    if (Object.keys(paramsFromUrl).length > 0) {
+    const hasUrlParams = Object.keys(paramsFromUrl).length > 0;
+    const currentFilters = filtersRef.current;
+    const hasFiltersSet = currentFilters && (
+      (currentFilters.search || '') !== '' ||
+      currentFilters.category !== 'all' ||
+      (currentFilters.tags && currentFilters.tags.length > 0) ||
+      (currentFilters.price && currentFilters.price.length > 0) ||
+      (currentFilters.minRating || 0) > 0
+    );
+
+    if (isInitRef.current) {
+      isInitRef.current = false;
+      if (hasUrlParams) {
+        isSyncingRef.current = true;
+        resetFilters();
+        setFilters(paramsFromUrl);
+        setTimeout(() => { isSyncingRef.current = false; }, 50);
+      }
+      return;
+    }
+
+    if (!currentUrl && hasFiltersSet) {
+      isSyncingRef.current = true;
+      resetFilters();
+      setTimeout(() => { isSyncingRef.current = false; }, 50);
+      return;
+    }
+
+    if (hasUrlParams) {
       isSyncingRef.current = true;
       resetFilters();
       setFilters(paramsFromUrl);

@@ -50,8 +50,28 @@ export const exportToBookmarksHTML = (
     }
     
     if (tool.alternatives && tool.alternatives.length > 0) {
-      const altNames = tool.alternatives.map(getToolName).join(',');
-      fields.push(`替代工具:${altNames}`);
+      const altList = tool.alternatives.map((altId) => {
+        const altTool = tools.find((t) => t.id === altId);
+        if (altTool) {
+          return `${altTool.name}|${altTool.url}`;
+        }
+        return getToolName(altId);
+      }).join(',');
+      fields.push(`替代工具:${altList}`);
+    }
+    
+    if (tool.screenshots && tool.screenshots.length > 0) {
+      const shotList = tool.screenshots.map((shot) => {
+        if (shot.caption) {
+          return `${shot.url}|${shot.caption}`;
+        }
+        return shot.url;
+      }).join(',');
+      fields.push(`截图:${shotList}`);
+    }
+    
+    if (tool.id) {
+      fields.push(`原始ID:${tool.id}`);
     }
     
     if (tool.priceInfo) {

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import {
   Search,
@@ -27,11 +27,30 @@ export const Header: React.FC = () => {
   const openAddToolModal = useUIStore((state) => state.openAddToolModal);
   const toggleSidebar = useUIStore((state) => state.toggleSidebar);
   const showToast = useUIStore((state) => state.showToast);
+  const filters = useUIStore((state) => state.filters);
+  const setFilters = useUIStore((state) => state.setFilters);
+  const resetFilters = useUIStore((state) => state.resetFilters);
+
+  useEffect(() => {
+    if (location.pathname === '/library') {
+      setSearchQuery(filters.search || '');
+    } else {
+      setSearchQuery('');
+    }
+  }, [location.pathname, filters.search]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    if (searchQuery.trim()) {
-      navigate(`/library?search=${encodeURIComponent(searchQuery.trim())}`);
+    const query = searchQuery.trim();
+    if (location.pathname === '/library') {
+      if (query) {
+        resetFilters();
+        setFilters({ search: query });
+      } else {
+        resetFilters();
+      }
+    } else if (query) {
+      navigate(`/library?search=${encodeURIComponent(query)}`);
     }
   };
 

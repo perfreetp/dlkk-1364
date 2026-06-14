@@ -1,14 +1,16 @@
 import React, { useState } from 'react';
-import { Search, SlidersHorizontal, X, Grid3X3, List, Star, BookmarkPlus, Save, RefreshCw } from 'lucide-react';
+import { createSearchParams } from 'react-router-dom';
+import { Search, SlidersHorizontal, X, Grid3X3, List, Star, BookmarkPlus, Save, RefreshCw, Share2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/common/Input';
 import { TagBadge } from '@/components/common/TagBadge';
 import { Button } from '@/components/common/Button';
 import { Modal } from '@/components/common/Modal';
-import type { FilterOptions, Tool } from '@/types';
+import type { FilterOptions, FilterPreset, Tool } from '@/types';
 import { CATEGORIES, PRICE_LABELS, PRICE_COLORS } from '@/types';
 import { useCollectionStore } from '@/store/useCollectionStore';
 import { useUIStore } from '@/store/useUIStore';
+import { copyToClipboard } from '@/utils/exportUtils';
 
 interface FilterPanelProps {
   filters: FilterOptions;
@@ -130,6 +132,48 @@ export const FilterPanel: React.FC<FilterPanelProps> = ({
     }
   };
 
+  const generatePresetShareUrl = (preset: FilterPreset): string => {
+    const { filters } = preset;
+    const params: Record<string, string> = {};
+
+    if (filters.category && filters.category !== 'all') {
+      params.category = filters.category;
+    }
+    if (filters.tags && filters.tags.length > 0) {
+      params.tags = filters.tags.join(',');
+    }
+    if (filters.price && filters.price.length > 0) {
+      params.price = filters.price.join(',');
+    }
+    if (filters.minRating && filters.minRating > 0) {
+      params.minRating = String(filters.minRating);
+    }
+    if (filters.search && filters.search.trim()) {
+      params.search = filters.search;
+    }
+    if (filters.sortBy) {
+      params.sortBy = filters.sortBy;
+    }
+
+    const search = createSearchParams(params).toString();
+    return `/library${search ? `?${search}` : ''}`;
+  };
+
+  const handleSharePreset = async (preset: FilterPreset) => {
+    try {
+      const path = generatePresetShareUrl(preset);
+      const fullUrl = `${window.location.origin}${path}`;
+      const success = await copyToClipboard(fullUrl);
+      if (success) {
+        showToast('筛选方案链接已复制', 'success');
+      } else {
+        showToast('链接复制失败，请手动复制', 'error');
+      }
+    } catch {
+      showToast('链接复制失败，请手动复制', 'error');
+    }
+  };
+
   return (
     <div className="bg-white rounded-2xl border border-gray-200 p-5 mb-6">
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-5">
@@ -219,6 +263,13 @@ export const FilterPanel: React.FC<FilterPanelProps> = ({
                 />
                 {hoveredPresetId === preset.id && (
                   <div className="absolute right-1 flex items-center gap-0.5">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleSharePreset(preset); }}
+                      className="p-0.5 hover:bg-black/10 rounded transition-colors"
+                      title="分享筛选链接"
+                    >
+                      <Share2 className="w-3 h-3" />
+                    </button>
                     <button
                       onClick={(e) => handleOverwritePreset(preset.id, e)}
                       className="p-0.5 hover:bg-black/10 rounded transition-colors"

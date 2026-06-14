@@ -23,7 +23,7 @@ interface CollectionState {
   shareCollectionAsLink: (collectionId: string) => Promise<{ success: boolean; url?: string }>;
   exportCollection: (collectionId: string, format: 'json' | 'html') => void;
   exportAll: (format: 'json' | 'html') => void;
-  importTools: (tools: Array<{ name: string; title?: string; url: string; description?: string; folder?: string; category?: string; tags?: string[]; price?: string; rating?: number; reviewCount?: number; alternatives?: string[]; priceInfo?: string; limitations?: string[] }>) => Promise<number>;
+  importTools: (tools: Array<{ name: string; title?: string; url: string; description?: string; folder?: string; category?: string; tags?: string[]; price?: string; rating?: number; reviewCount?: number; alternatives?: string[]; priceInfo?: string; limitations?: string[]; originalId?: string; screenshots?: Array<{ url: string; caption?: string }>; alternativesRaw?: string[] }>) => Promise<number>;
   addTag: (name: string, color: string) => Tag;
   getAllTags: () => string[];
 }
@@ -178,6 +178,30 @@ export const useCollectionStore = create<CollectionState>()(
         const { addTool, checkForDuplicate, updateTool } = useToolStore.getState();
         let importedCount = 0;
 
+        const findToolIdByAltRaw = (raw: string, currentTools: Tool[]): string | undefined => {
+          let name: string;
+          let url: string | undefined;
+          if (raw.includes('|')) {
+            const parts = raw.split('|');
+            name = parts[0].trim();
+            url = parts[1]?.trim();
+          } else {
+            name = raw.trim();
+            url = undefined;
+          }
+          if (url) {
+            const byUrl = currentTools.find((t) => t.url === url);
+            if (byUrl) return byUrl.id;
+          }
+          const byName = currentTools.find((t) => t.name === name);
+          return byName?.id;
+        };
+
+        const findToolIdByName = (name: string, currentTools: Tool[]): string | undefined => {
+          const byName = currentTools.find((t) => t.name === name);
+          return byName?.id;
+        };
+
         for (const bookmark of bookmarks) {
           const duplicate = checkForDuplicate(bookmark.url);
           if (duplicate) continue;
@@ -201,20 +225,23 @@ export const useCollectionStore = create<CollectionState>()(
 
           let description = bookmark.description || '';
           let alternatives: string[] = [];
+          const currentTools = useToolStore.getState().tools;
 
-          if (bookmark.alternatives && bookmark.alternatives.length > 0) {
-            const currentTools = useToolStore.getState().tools;
+          if (bookmark.alternativesRaw && bookmark.alternativesRaw.length > 0) {
+            alternatives = bookmark.alternativesRaw
+              .map((raw) => findToolIdByAltRaw(raw, currentTools))
+              .filter((id): id is string => !!id);
+          } else if (bookmark.alternatives && bookmark.alternatives.length > 0) {
             alternatives = bookmark.alternatives
-              .map((name) => currentTools.find((t) => t.name === name)?.id)
+              .map((name) => findToolIdByName(name, currentTools))
               .filter((id): id is string => !!id);
           } else if (description) {
             const altMatch = description.match(/[|｜]?\s*替代工具[：:]\s*(.+)$/);
             if (altMatch) {
               const altNamesStr = altMatch[1].trim();
-              const altNames = altNamesStr.split(/[、,，]/).map((s) => s.trim()).filter(Boolean);
-              const currentTools = useToolStore.getState().tools;
-              alternatives = altNames
-                .map((name) => currentTools.find((t) => t.name === name)?.id)
+              const altItems = altNamesStr.split(/[、,，]/).map((s) => s.trim()).filter(Boolean);
+              alternatives = altItems
+                .map((raw) => findToolIdByAltRaw(raw, currentTools))
                 .filter((id): id is string => !!id);
               description = description.replace(altMatch[0], '').trim();
               if (description.endsWith('|') || description.endsWith('｜')) {
@@ -228,6 +255,16 @@ export const useCollectionStore = create<CollectionState>()(
             price = bookmark.price;
           }
 
+          let screenshots: Screenshot[] = [];
+          if (bookmark.screenshots && bookmark.screenshots.length > 0) {
+            screenshots = bookmark.screenshots.map((s) => ({
+              id: generateId(),
+              url: s.url,
+              caption: s.caption,
+              uploadedAt: Date.now(),
+            }));
+          }
+
           const result = await addTool({
             name: bookmark.name || bookmark.title || bookmark.url,
             url: bookmark.url,
@@ -237,7 +274,7 @@ export const useCollectionStore = create<CollectionState>()(
             price,
             priceInfo: bookmark.priceInfo,
             limitations: bookmark.limitations,
-            screenshots: [],
+            screenshots,
             alternatives,
           });
 
